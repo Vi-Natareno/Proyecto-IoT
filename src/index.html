@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">    
+    <head>
+        <meta charset="UTF-8">
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+        <style>
+            .container {
+                background-color: #f3f4f7;
+                width: 45%;
+                min-width: 300px; 
+                box-sizing: border-box;
+                padding: 15px;
+            }
+            .grid-container {
+                display: flex;
+                flex-wrap: wrap; 
+                justify-content: center; 
+                gap: 20px; 
+                padding: 20px;
+            }
+        </style>
+        <title>Monitor de Trafico</title>
+    </head>
+    <body>
+
+    <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#2c3e50; z-index:9999; display:flex; justify-content:center; align-items:center; font-family:sans-serif;">
+        <div style="background:white; padding:30px; border-radius:8px; text-align:center; box-shadow: 0px 4px 10px rgba(0,0,0,0.3);">
+            <h2>Monitoreo trafico Av. Las Torres</h2>
+            <h3>Iniciar Sesión</h3>
+            <input type="password" id="password-input" placeholder="Contraseña" style="padding:10px; width:200px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px;"><br>
+            <button id="login-btn" style="padding:10px 20px; background:#1BE03F; border:none; color:white; border-radius:4px; cursor:pointer; font-weight:bold;">Entrar</button>
+            <p id="login-error" style="color:red; margin-top:10px; display:none; font-size:14px;">BUUP Contraseña incorrecta</p>
+        </div>
+    </div>
+
+
+        <h1>Monitor de Tráfico</h1>
+        <div class="grid-container">
+        <!-- PRIMERA GRÁFICA -->
+        <div class="container">
+            <h3>Flujo de carros en carriles</h3>
+            <canvas id="myChart"></canvas>
+        </div>
+
+        <div class="container">
+            <h3>Trafico pesado (1: si - 0: no)</h3>
+            <canvas id="myChart2"></canvas>
+        </div>
+
+        <div class="container">
+            <h3>Tiempo de semaforo verde</h3>
+            <canvas id="myChart3"></canvas>
+        </div>
+
+        <div class="container">
+            <h3>Tiempo de semaforo vuelta en U</h3>
+            <canvas id="myChart4"></canvas>
+        </div>
+
+        <div class="container">
+            <h3>Total de carros en la avenida</h3>
+            <canvas id="myChart5"></canvas>
+        </div>
+
+        <div class="container">
+            <h3>Carros esperando vuelta en U</h3>
+            <canvas id="myChart6"></canvas>
+        </div>
+    </div>
+        
+        <script>
+            $(document).ready(function(){
+
+                //INICIO DE SESION
+                const CLAVE_CIFRADA_SECRETA = "sdvv"; //pass
+                const DESPLAZAMIENTO = 3;
+
+                //aplicar cifrado desplazando texto
+                function crifrafoCesar(texto, desplazar) {
+                    return texto.split('').map(function(char) {
+                        var codigo = char.charCodeAt(0);
+                        if (codigo >= 65 && codigo <= 90) { //mayusculas
+                            return String.fromCharCode(((codigo - 65 + desplazar) % 26) + 65);
+                        }
+                        else if (codigo >= 97 && codigo <= 122) { //minusculas
+                            return String.fromCharCode(((codigo - 97 + desplazar) % 26) + 97);
+                        }
+                        return char; 
+                    }).join('');
+                }
+
+                $("#login-btn").click(function() {
+                    var intentoPassword = $("#password-input").val();
+                    
+                    // Ciframos lo que escribió el usuario para compararlo con el secreto
+                    if (crifrafoCesar(intentoPassword, DESPLAZAMIENTO) === CLAVE_CIFRADA_SECRETA) {
+                        $("#login-overlay").fadeOut(); // Desaparece la pantalla de login
+                        getData(); // Ejecuta tu función para cargar las gráficas de ThingSpeak
+                    } else {
+                        $("#login-error").show(); // Muestra el mensaje de error
+                    }
+                });
+
+                $("#password-input").keypress(function(e) {
+                    if(e.which == 13) { $("#login-btn").click(); }
+                });
+
+                //GRAFICAS
+
+                function getData(){
+                    var url = "https://api.thingspeak.com/channels/3386034/fields/1,2,3,4,5,6,7.json?api_key=BRH73V4MPVS99KH7&results=10"
+                    
+                    $.getJSON(url, function(data){
+                        var carros_en_espera_U = [];
+                        var total_autos = [];
+                        var carros_izq = [];
+                        var carros_der = [];
+                        var tiempo_en_verde = [];
+                        var tiempo_en_U = [];
+                        var trafico_alto = [];
+                        var timeStamps = [];
+                        
+                        $.each(data.feeds, function(index, feed){
+                            timeStamps.push(feed.created_at);
+                            carros_en_espera_U.push(feed.field1);
+                            total_autos.push(feed.field2);
+                            carros_izq.push(feed.field3);
+                            carros_der.push(feed.field4);
+                            tiempo_en_verde.push(feed.field5);
+                            tiempo_en_U.push(feed.field6);
+                            trafico_alto.push(feed.field7);
+                        });
+
+                        tiempo_en_verde.forEach(function(valor, index) {
+                            tiempo_en_verde[index] = valor / 1000;
+                        });
+                        tiempo_en_U.forEach(function(valor, index) {
+                            tiempo_en_U[index] = valor / 1000;
+                        });                  
+
+                        var ctx = document.getElementById('myChart').getContext('2d');
+                        var tabla = new Chart(ctx, {
+                            type: 'line',
+                            data:{
+                                labels: timeStamps,
+                                datasets: [
+                                    { label:'Carros carril izquierdo', data: carros_izq, borderColor: '#E03A1B', fill: false, borderWidth: 2 },
+                                    { label:'Carros carril derecho', data: carros_der, borderColor: '#051FE8', fill: false, borderWidth: 2 }
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                        /*Grafica 2*/
+                        var ctx2 = document.getElementById('myChart2').getContext('2d');
+                        var tabla2 = new Chart(ctx2, {
+                            type: 'line',
+                            data:{
+                                labels: timeStamps, // Reutiliza el mismo tiempo
+                                datasets: [
+                                    { label:'Trafico alto (1: si - 0: no)', data: trafico_alto, borderColor: '#1B7FE0', fill: false, borderWidth: 2, lineTension: 0},
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                        var ctx3 = document.getElementById('myChart3').getContext('2d');
+                        var tabla3 = new Chart(ctx3, {
+                            type: 'bar',
+                            data:{
+                                labels: timeStamps,
+                                datasets: [
+                                    { label:'Duracion en segundos', data: tiempo_en_verde, borderColor: '#05E809', backgroundColor: '#05E809', borderWidth: 2 },
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                        var ctx4 = document.getElementById('myChart4').getContext('2d');
+                        var tabla4 = new Chart(ctx4, {
+                            type: 'bar',
+                            data:{
+                                labels: timeStamps,
+                                datasets: [
+                                    { label:'Duracion en segundos', data: tiempo_en_U, borderColor: '#253C9C', backgroundColor: '#253C9C', borderWidth: 2 },
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                        var ctx5 = document.getElementById('myChart5').getContext('2d');
+                        var tabla5 = new Chart(ctx5, {
+                            type: 'line',
+                            data:{
+                                labels: timeStamps,
+                                datasets: [
+                                    { label:'Cantidad autos', data: total_autos, borderColor: '#1A1616', fill: false, borderWidth: 2, lineTension: 0 },
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                        var ctx6 = document.getElementById('myChart6').getContext('2d');
+                        var tabla6 = new Chart(ctx6, {
+                            type: 'bar',
+                            data:{
+                                labels: timeStamps,
+                                datasets: [
+                                    { label:'Cantidad de autos', data: carros_en_espera_U, borderColor: '#48494D', backgroundColor: '#48494D', borderWidth: 2 },
+                                ]
+                            },
+                            options: { scales: { yAxes: [{ ticks: { beginAtZero: true } }] } }
+                        });
+
+                    });
+                }
+                getData();
+            });
+        </script>
+    </body>
+</html>
