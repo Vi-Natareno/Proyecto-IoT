@@ -93,14 +93,15 @@
                 $("#login-btn").click(function() {
                     var intentoPassword = $("#password-input").val();
                     
-                    // Ciframos lo que escribió el usuario para compararlo con el secreto
+                    // comparar contra con contra cifrada guardada
                     if (crifrafoCesar(intentoPassword, DESPLAZAMIENTO) === CLAVE_CIFRADA_SECRETA) {
-                        $("#login-overlay").fadeOut(); // Desaparece la pantalla de login
+                        $("#login-overlay").fadeOut(); // desaparece pantalla de login
                         getData(); // Ejecuta tu función para cargar las gráficas de ThingSpeak
                     } else {
                         $("#login-error").show(); // Muestra el mensaje de error
                     }
                 });
+
 
                 $("#password-input").keypress(function(e) {
                     if(e.which == 13) { $("#login-btn").click(); }
@@ -109,7 +110,7 @@
                 //GRAFICAS
 
                 function getData(){
-                    var url = "https://api.thingspeak.com/channels/3386034/fields/1,2,3,4,5,6,7.json?api_key=BRH73V4MPVS99KH7&results=10"
+                    var url = "https://api.thingspeak.com/channels/3386034/fields/1,2,3,4,5,6,7.json?api_key=BRH73V4MPVS99KH7&results=20"
                     
                     $.getJSON(url, function(data){
                         var carros_en_espera_U = [];
